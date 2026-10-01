@@ -1,2 +1,18 @@
-node_modules
+node_modules/
+
+# Claves y contraseñas: nunca subir (sí se sube .env.example, sin datos reales)
 .env
+.env.*
+!.env.example
+
+# Scripts SQL (no se suben; las tablas las crea la API al iniciar: src/esquema.js)
+sql/
+
+# Reportes del taller con datos de clientes
+*.xlsx
+*.xls
+*.csv
+
+*.log
+.DS_Store
+Thumbs.db

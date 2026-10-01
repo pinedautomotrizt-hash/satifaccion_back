@@ -12,7 +12,7 @@ export const config = {
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'satisfaccion',
   },
-  estadosPermitidos: lista(process.env.ESTADOS_PERMITIDOS || 'CERRADO').map((e) => e.toUpperCase()),
+  estadosPermitidos: lista(process.env.ESTADOS_PERMITIDOS || 'CERRADO,FACTURADO').map((e) => e.toUpperCase()),
   adminApiKey: process.env.ADMIN_API_KEY || '',
   corsOrigin: lista(process.env.CORS_ORIGIN),
 };

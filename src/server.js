@@ -5,6 +5,7 @@ import { pool } from './db.js';
 import { ordenesRouter } from './routes/ordenes.js';
 import { encuestasRouter } from './routes/encuestas.js';
 import { adminRouter } from './routes/admin.js';
+import { prepararBaseDeDatos } from './esquema.js';
 
 const app = express();
 
@@ -28,7 +29,15 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ mensaje: 'Error interno del servidor.' });
 });
 
+try {
+  await prepararBaseDeDatos();
+  console.log(`Base de datos lista (${config.db.database} en ${config.db.host})`);
+} catch (err) {
+  console.error('No se pudo preparar la base de datos:', err.message);
+  process.exit(1);
+}
+
 app.listen(config.port, () => {
-  console.log(`API de satisfacción escuchando en http://localhost:${config.port}`);
+  console.log(`API de satisfacción escuchando en el puerto ${config.port}`);
   console.log(`Estados que permiten votar: ${config.estadosPermitidos.join(', ')}`);
 });

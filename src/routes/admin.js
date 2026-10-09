@@ -40,28 +40,40 @@ adminRouter.get('/importaciones', async (_req, res) => {
   res.json({ importaciones: filas });
 });
 
-// GET /api/admin/resumen?desde=YYYY-MM-DD&hasta=YYYY-MM-DD
+// GET /api/admin/sedes  -> sedes (columna "Local" del reporte) que tienen órdenes cargadas
+adminRouter.get('/sedes', async (_req, res) => {
+  const [filas] = await pool.query(
+    `SELECT local AS sede, COUNT(*) AS ordenes FROM ordenes_trabajo
+      WHERE local IS NOT NULL AND local <> '' GROUP BY local ORDER BY local`,
+  );
+  res.json({ sedes: filas });
+});
+
+// GET /api/admin/resumen?desde=YYYY-MM-DD&hasta=YYYY-MM-DD[&sede=Pineda Callao]
 adminRouter.get('/resumen', async (req, res) => {
   const hoy = fechaLocal(new Date());
   const desde = /^\d{4}-\d{2}-\d{2}$/.test(req.query.desde) ? req.query.desde : hoy.slice(0, 8) + '01';
   const hasta = /^\d{4}-\d{2}-\d{2}$/.test(req.query.hasta) ? req.query.hasta : hoy;
+  const sede = String(req.query.sede ?? '').trim().slice(0, 80); // vacío = todas las sedes
 
   // El volumen es de cientos de encuestas al mes: se traen todas las del rango y se calcula aquí
   const [encuestas] = await pool.query(
     `SELECT e.id, e.satisfaccion, e.recomendacion, e.comentario, e.created_at,
-            o.numero_ot, o.placa, o.cliente, o.marca, o.modelo, o.servicio, o.asesor, o.estado
+            o.numero_ot, o.placa, o.cliente, o.marca, o.modelo, o.servicio, o.asesor, o.estado, o.local AS sede
        FROM encuestas_satisfaccion e
        JOIN ordenes_trabajo o ON o.id = e.orden_id
       WHERE e.created_at BETWEEN ? AND ?
+        ${sede ? 'AND UPPER(o.local) = UPPER(?)' : ''}
       ORDER BY e.created_at DESC`,
-    [`${desde} 00:00:00`, `${hasta} 23:59:59`],
+    [`${desde} 00:00:00`, `${hasta} 23:59:59`, ...(sede ? [sede] : [])],
   );
 
   res.json({
-    desde, hasta,
+    desde, hasta, sede: sede || null,
     ...indicadores(encuestas),
     tendencia: tendencia(encuestas, desde, hasta),
-    porAsesor: porAsesor(encuestas),
+    porSede: agrupar(encuestas, 'sede', 'Sin sede'),
+    porAsesor: agrupar(encuestas, 'asesor', 'Sin asesor'),
     detalle: encuestas.slice(0, 500),
   });
 });
@@ -136,18 +148,19 @@ function tendencia(encuestas, desde, hasta) {
   };
 }
 
-function porAsesor(encuestas) {
+/** NPS y CSI agrupados por un campo (asesor, sede). */
+function agrupar(encuestas, campo, sinValor) {
   const grupos = new Map();
   for (const e of encuestas) {
-    const k = e.asesor || 'Sin asesor';
+    const k = e[campo] || sinValor;
     if (!grupos.has(k)) grupos.set(k, []);
     grupos.get(k).push(e);
   }
   return [...grupos]
-    .map(([asesor, lista]) => {
+    .map(([nombre, lista]) => {
       const i = indicadores(lista);
       return {
-        asesor, total: i.total, nps: i.nps.valor,
+        [campo]: nombre, total: i.total, nps: i.nps.valor,
         pctSatisfechos: i.satisfaccion.pctSatisfechos,
       };
     })
